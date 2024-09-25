@@ -8,7 +8,7 @@ from src.models.eval import evaluate
 from src.models.finetune import finetune
 from src.models.modeling import ClassificationHead, ImageEncoder, ImageClassifier
 from src.models.utils import fisher_load
-from src.models.zeroshot import get_zeroshot_classifier
+from src.models.zeroshot import get_train_classnames, get_zeroshot_classifier
 from src.args import parse_arguments
 
 
@@ -46,7 +46,8 @@ def wise_ft(args):
     if args.load is None:
         # Build and save zero-shot model
         image_encoder = ImageEncoder(args, keep_lang=True)
-        classification_head = get_zeroshot_classifier(args, image_encoder.model)
+        classnames = get_train_classnames(args)
+        classification_head = get_zeroshot_classifier(args, image_encoder.model, classnames)
         delattr(image_encoder.model, 'transformer')
         classifier = ImageClassifier(image_encoder, classification_head, process_images=False)
         zeroshot_checkpoint = os.path.join(args.save, 'zeroshot.pt')

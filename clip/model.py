@@ -340,7 +340,7 @@ class CLIP(nn.Module):
 
     @property
     def dtype(self):
-        return self.visual.conv1.weight.dtype
+        return next(self.parameters()).dtype
 
     def encode_image(self, image):
         return self.visual(image.type(self.dtype))

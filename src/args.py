@@ -73,6 +73,16 @@ def parse_arguments():
         default=128,
     )
     parser.add_argument(
+        "--batch-size-eval",
+        type=int,
+        default=128,
+    )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=4,
+    )
+    parser.add_argument(
         "--lr",
         type=float,
         default=0.001,

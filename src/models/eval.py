@@ -2,9 +2,11 @@ import os
 import json
 
 import torch
-import numpy as np
 
+from src.args import parse_arguments
 from src.models import utils
+from src.models.modeling import TextEncoder, ImageEncoder, ImageClassifier
+from src.models.zeroshot import get_train_classnames, get_zeroshot_classifier
 from src.datasets.common import get_dataloader, maybe_dictionarize
 
 import src.datasets as datasets
@@ -81,15 +83,22 @@ def evaluate(image_classifier, args):
     if args.eval_datasets is None:
         return
     info = vars(args)
+    assert args.eval_datasets is not None
+    text_encoder = TextEncoder(args).model
     for i, dataset_name in enumerate(args.eval_datasets):
         print('Evaluating on', dataset_name)
         dataset_class = getattr(datasets, dataset_name)
         dataset = dataset_class(
             image_classifier.val_preprocess,
             location=args.data_location,
-            batch_size=args.batch_size
+            batch_size=args.batch_size_eval,
+            classnames=args.classnames,
+            num_workers=args.num_workers,
         )
 
+        classification_head = get_zeroshot_classifier(args, text_encoder, dataset.classnames)
+        classification_head = classification_head.to(args.device)
+        image_classifier.classification_head = classification_head
         results = eval_single_dataset(image_classifier, dataset, args)
 
         if 'top1' in results:
@@ -110,3 +119,25 @@ def evaluate(image_classifier, args):
         print('Results not saved (to do so, use --results_db to specify a path).')
 
     return info
+
+
+def eval(args):
+    args.freeze_encoder = True
+    if args.load is not None:
+        classifier = ImageClassifier.load(args.load)
+    else:
+        image_encoder = ImageEncoder(args, keep_lang=True)
+        classnames = get_train_classnames(args)
+        classification_head = get_zeroshot_classifier(args, image_encoder.model, classnames)
+        delattr(image_encoder.model, 'transformer')
+        classifier = ImageClassifier(image_encoder, classification_head, process_images=False)
+    
+    evaluate(classifier, args)
+
+    if args.save is not None:
+        classifier.save(args.save)
+
+
+if __name__ == '__main__':
+    args = parse_arguments()
+    eval(args)

@@ -1,32 +1,31 @@
-import os
-
 import torch
 from tqdm import tqdm
-
-import numpy as np
 
 import clip.clip as clip
 
 import src.templates as templates
 import src.datasets as datasets
 
-from src.args import parse_arguments
-from src.models.modeling import ClassificationHead, ImageEncoder, ImageClassifier
-from src.models.eval import evaluate
+from src.models.modeling import ClassificationHead
 
 
-def get_zeroshot_classifier(args, clip_model):
-    assert args.template is not None
+def get_train_classnames(args):
     assert args.train_dataset is not None
-    template = getattr(templates, args.template)
-    logit_scale = clip_model.logit_scale
     dataset_class = getattr(datasets, args.train_dataset)
     dataset = dataset_class(
         None,
         location=args.data_location,
         batch_size=args.batch_size,
-        classnames=args.classnames
+        classnames=args.classnames,
+        num_workers=args.num_workers,
     )
+    return dataset.classnames
+
+
+def get_zeroshot_classifier(args, clip_model, classnames):
+    assert args.template is not None
+    template = getattr(templates, args.template)
+    logit_scale = clip_model.logit_scale
     device = args.device
     clip_model.eval()
     clip_model.to(device)
@@ -34,7 +33,7 @@ def get_zeroshot_classifier(args, clip_model):
     print('Getting zeroshot weights.')
     with torch.no_grad():
         zeroshot_weights = []
-        for classname in tqdm(dataset.classnames):
+        for classname in tqdm(classnames):
             texts = []
             for t in template:
                 texts.append(t(classname))
@@ -58,24 +57,3 @@ def get_zeroshot_classifier(args, clip_model):
     classification_head = ClassificationHead(normalize=True, weights=zeroshot_weights)
 
     return classification_head
-
-
-def eval(args):
-    args.freeze_encoder = True
-    if args.load is not None:
-        classifier = ImageClassifier.load(args.load)
-    else:
-        image_encoder = ImageEncoder(args, keep_lang=True)
-        classification_head = get_zeroshot_classifier(args, image_encoder.model)
-        delattr(image_encoder.model, 'transformer')
-        classifier = ImageClassifier(image_encoder, classification_head, process_images=False)
-    
-    evaluate(classifier, args)
-
-    if args.save is not None:
-        classifier.save(args.save)
-
-
-if __name__ == '__main__':
-    args = parse_arguments()
-    eval(args)

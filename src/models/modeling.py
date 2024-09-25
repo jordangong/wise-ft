@@ -32,6 +32,31 @@ class ImageEncoder(torch.nn.Module):
         return utils.torch_load(filename)
 
 
+class TextEncoder(torch.nn.Module):
+    def __init__(self, args, keep_vision=False):
+        super().__init__()
+
+        self.model, _, _ = clip.load(args.model, args.device, jit=False)
+        
+        self.cache_dir = args.cache_dir
+
+        if not keep_vision and hasattr(self.model, 'visual'):
+            delattr(self.model, 'visual')
+
+    def forward(self, texts):
+        assert self.model is not None
+        return self.model.encode_text(texts)
+
+    def save(self, filename):
+        print(f'Saving text encoder to {filename}')
+        utils.torch_save(self, filename)
+
+    @classmethod
+    def load(cls, filename):
+        print(f'Loading text encoder from {filename}')
+        return utils.torch_load(filename)
+
+
 class ClassificationHead(torch.nn.Linear):
     def __init__(self, normalize, weights, biases=None):
         output_size, input_size = weights.shape
