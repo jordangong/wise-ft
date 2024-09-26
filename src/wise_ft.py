@@ -65,8 +65,8 @@ def wise_ft(args):
     # Load models
     zeroshot = ImageClassifier.load(zeroshot_checkpoint)
     finetuned = ImageClassifier.load(finetuned_checkpoint)
-    theta_0 = {k: v.clone() for k, v in zeroshot.state_dict().items()}
-    theta_1 = {k: v.clone() for k, v in finetuned.state_dict().items()}
+    theta_0 = {k: v.clone() for k, v in zeroshot.image_encoder.state_dict().items()}
+    theta_1 = {k: v.clone() for k, v in finetuned.image_encoder.state_dict().items()}
     del zeroshot
 
     if args.fisher is None:
@@ -87,7 +87,7 @@ def wise_ft(args):
         theta = _merge(alpha, theta_0, theta_1, fishers, args.fisher_floor)
 
         # update the model (in-place) acccording to the new weights
-        finetuned.load_state_dict(theta)
+        finetuned.image_encoder.load_state_dict(theta)
 
         # save model
         finetuned.save(os.path.join(args.save, f'wise_ft_alpha={alpha:.3f}.pt'))
